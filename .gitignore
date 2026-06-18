@@ -2,3 +2,16 @@
 __pycache__/
 *.pyc
 support_tickets.jsonl
+.venv/
+.env
+.env.*
+*.log
+
+# Standalone nested repository.
+k-sim-support-system/
+
+# Generated social content; CONTENT_HISTORY.md tracks the editorial record.
+FB貼文圖片_*/
+FB貼文成稿_旅遊卡_*.md
+FB貼文與圖片規劃_旅遊卡_*.md
+一週社群排程表_旅遊卡商品題材_*.md
