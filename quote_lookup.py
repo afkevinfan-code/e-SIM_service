@@ -355,8 +355,8 @@ def search_products(
 
     ranked.sort(
         key=lambda item: (
-            -item.score,
             item.quote_total if item.quote_total is not None else float("inf"),
+            -item.score,
         )
     )
     return ranked[:limit] if limit is not None else ranked
