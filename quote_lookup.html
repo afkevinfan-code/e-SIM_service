@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>K大叔上網卡商品查詢</title>
+  <title>K大叔上網卡報價查詢</title>
   <style>
     :root {
       --bg: #f5f7fb;
@@ -48,7 +48,7 @@
     .search-panel { padding: 18px; }
     .search-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 150px 108px;
+      grid-template-columns: minmax(180px, 1fr) 118px minmax(180px, 1fr) 150px 108px;
       gap: 12px;
       margin-top: 14px;
     }
@@ -76,6 +76,7 @@
     .field { margin: 6px 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
     .field strong { color: var(--text); }
     .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); text-align: center; }
+    .quote-note { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
     @media (max-width: 720px) {
       header .wrap { align-items: flex-start; flex-direction: column; padding: 15px 0; }
       .search-grid { grid-template-columns: 1fr; }
@@ -86,19 +87,27 @@
 <body>
   <header>
     <div class="wrap">
-      <h1>K大叔上網卡商品查詢</h1>
+      <h1>K大叔上網卡報價查詢</h1>
       <a href="/">客服系統</a>
     </div>
   </header>
   <main class="wrap">
     <section class="search-panel" aria-labelledby="search-title">
-      <h2 id="search-title">查詢方案</h2>
-      <p class="hint">可輸入目的地、天數、流量或方案類型，例如：日本 5天 eSIM、歐洲 30天、不限流量。</p>
+      <h2 id="search-title">建立報價條件</h2>
+      <p class="hint">依目的地、使用天數、流量需求與商品類型找出候選方案。系統會優先排序目的地與天數相符的商品。</p>
       <form id="search-form">
         <div class="search-grid">
           <div>
-            <label for="query">關鍵字</label>
-            <input id="query" name="q" placeholder="例：日本 5天 eSIM" autocomplete="off" required>
+            <label for="query">目的地 / 國家</label>
+            <input id="query" name="q" placeholder="例：日本、歐洲、美國" autocomplete="off" required>
+          </div>
+          <div>
+            <label for="days">使用天數</label>
+            <input id="days" name="days" type="number" min="1" max="365" placeholder="例：5">
+          </div>
+          <div>
+            <label for="requirements">流量 / 方案需求</label>
+            <input id="requirements" name="requirements" placeholder="例：不限流量、1GB/天、可熱點">
           </div>
           <div>
             <label for="product-type">商品類型</label>
@@ -111,6 +120,7 @@
           <button type="submit">查詢</button>
         </div>
       </form>
+      <p class="quote-note">系統參考報價以 Excel 的既有「報價成本」邏輯計算；正式對外售價仍需依 K大叔上網卡的售價策略確認。</p>
     </section>
     <p id="status" class="status">輸入條件後開始查詢。</p>
     <section id="results" class="result-list" aria-live="polite"></section>
@@ -118,6 +128,8 @@
   <script>
     const form = document.querySelector('#search-form');
     const query = document.querySelector('#query');
+    const days = document.querySelector('#days');
+    const requirements = document.querySelector('#requirements');
     const productType = document.querySelector('#product-type');
     const status = document.querySelector('#status');
     const results = document.querySelector('#results');
@@ -150,7 +162,7 @@
         card.append(element('h3', item.name));
         const meta = document.createElement('div');
         meta.className = 'meta';
-        [item.source, `${item.quote_label}：${item.quote || '待確認'}`, `成本：${item.cost || '待確認'}`]
+        [item.source, `系統參考報價：${item.quote || '待確認'}`, `內部成本：${item.cost || '待確認'}`]
           .forEach((text) => meta.append(element('span', text, 'pill')));
         card.append(meta);
         [
@@ -166,8 +178,12 @@
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const keyword = query.value.trim();
-      if (!keyword) return;
+      const keyword = [
+        query.value.trim(),
+        days.value ? `${days.value}天` : '',
+        requirements.value.trim(),
+      ].filter(Boolean).join(' ');
+      if (!query.value.trim()) return;
       status.className = 'status';
       status.textContent = '查詢中...';
       results.replaceChildren();
