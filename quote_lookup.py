@@ -54,6 +54,16 @@ def resolve_data_path(explicit_path: str | None, default_path: Path, legacy_path
 
 def normalize(text: object) -> str:
     value = str(text or "").casefold().replace(" ", "")
+    country_aliases = {
+        "希臘": "希腊",
+        "義大利": "意大利",
+        "克羅埃西亞": "克罗地亚",
+        "克罗埃西亚": "克罗地亚",
+        "斯洛維尼亞": "斯洛文尼亚",
+        "斯洛维尼亚": "斯洛文尼亚",
+    }
+    for old, new in country_aliases.items():
+        value = value.replace(old, new)
     replacements = {
         "國": "国",
         "臺": "台",
