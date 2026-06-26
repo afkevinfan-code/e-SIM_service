@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>K大叔上網卡商品查詢</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8dee9;
+      --text: #202631;
+      --muted: #687385;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --soft: #e8f3f1;
+      --error: #b42318;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+    }
+    header {
+      min-height: 72px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+    header .wrap {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    h1 { margin: 0; font-size: 24px; letter-spacing: 0; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    a { color: var(--accent-strong); text-underline-offset: 3px; }
+    main { padding: 24px 0 40px; }
+    .search-panel, .result-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .search-panel { padding: 18px; }
+    .search-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 150px 108px;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    label { display: block; margin: 0 0 6px; font-size: 14px; font-weight: 650; }
+    input, select, button { min-height: 42px; border-radius: 6px; font: inherit; }
+    input, select { width: 100%; border: 1px solid var(--line); padding: 10px 11px; background: #fff; }
+    button {
+      align-self: end;
+      border: 0;
+      padding: 0 15px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button:hover { background: var(--accent-strong); }
+    .hint, .status { color: var(--muted); font-size: 14px; line-height: 1.55; }
+    .status { min-height: 24px; margin: 16px 0 10px; }
+    .status.error { color: var(--error); font-weight: 700; }
+    .result-list { display: grid; gap: 12px; }
+    .result-card { padding: 15px; }
+    .result-card h3 { margin: 0 0 9px; font-size: 16px; line-height: 1.45; }
+    .meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 9px; }
+    .pill { border-radius: 999px; padding: 3px 8px; background: var(--soft); color: #114b47; font-size: 12px; font-weight: 700; }
+    .field { margin: 6px 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .field strong { color: var(--text); }
+    .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); text-align: center; }
+    @media (max-width: 720px) {
+      header .wrap { align-items: flex-start; flex-direction: column; padding: 15px 0; }
+      .search-grid { grid-template-columns: 1fr; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>K大叔上網卡商品查詢</h1>
+      <a href="/">客服系統</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="search-panel" aria-labelledby="search-title">
+      <h2 id="search-title">查詢方案</h2>
+      <p class="hint">可輸入目的地、天數、流量或方案類型，例如：日本 5天 eSIM、歐洲 30天、不限流量。</p>
+      <form id="search-form">
+        <div class="search-grid">
+          <div>
+            <label for="query">關鍵字</label>
+            <input id="query" name="q" placeholder="例：日本 5天 eSIM" autocomplete="off" required>
+          </div>
+          <div>
+            <label for="product-type">商品類型</label>
+            <select id="product-type" name="type">
+              <option value="all">全部</option>
+              <option value="esim">eSIM</option>
+              <option value="card">實體卡</option>
+            </select>
+          </div>
+          <button type="submit">查詢</button>
+        </div>
+      </form>
+    </section>
+    <p id="status" class="status">輸入條件後開始查詢。</p>
+    <section id="results" class="result-list" aria-live="polite"></section>
+  </main>
+  <script>
+    const form = document.querySelector('#search-form');
+    const query = document.querySelector('#query');
+    const productType = document.querySelector('#product-type');
+    const status = document.querySelector('#status');
+    const results = document.querySelector('#results');
+
+    function element(tag, text, className = '') {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function field(label, value) {
+      if (!value) return null;
+      const line = document.createElement('p');
+      line.className = 'field';
+      const title = element('strong', `${label}：`);
+      line.append(title, document.createTextNode(value));
+      return line;
+    }
+
+    function renderResults(items) {
+      results.replaceChildren();
+      if (!items.length) {
+        results.append(element('p', '找不到符合條件的商品，請放寬目的地、天數或流量條件。', 'empty'));
+        return;
+      }
+      items.forEach((item) => {
+        const card = document.createElement('article');
+        card.className = 'result-card';
+        card.append(element('h3', item.name));
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        [item.source, `${item.quote_label}：${item.quote || '待確認'}`, `成本：${item.cost || '待確認'}`]
+          .forEach((text) => meta.append(element('span', text, 'pill')));
+        card.append(meta);
+        [
+          field('使用地', item.destinations),
+          field('內容', item.description),
+          field('備註', item.note),
+          field('啟用方式', item.activation),
+          field('原始單價', item.unit_price),
+        ].filter(Boolean).forEach((line) => card.append(line));
+        results.append(card);
+      });
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const keyword = query.value.trim();
+      if (!keyword) return;
+      status.className = 'status';
+      status.textContent = '查詢中...';
+      results.replaceChildren();
+      const params = new URLSearchParams({ q: keyword, type: productType.value, limit: '20' });
+      try {
+        const response = await fetch(`/api/products?${params}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || '資料讀取失敗。');
+        renderResults(payload.results || []);
+        status.textContent = payload.results.length ? `找到 ${payload.results.length} 筆候選商品。` : payload.message;
+      } catch (error) {
+        status.className = 'status error';
+        status.textContent = error.message || '查詢失敗，請稍後再試。';
+      }
+    });
+  </script>
+</body>
+</html>

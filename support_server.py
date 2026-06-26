@@ -22,6 +22,7 @@ from quote_lookup import format_money, search_products
 
 PROJECT_DIR = Path(__file__).resolve().parent
 TICKET_LOG_PATH = PROJECT_DIR / "support_tickets.jsonl"
+LOOKUP_PAGE_PATH = PROJECT_DIR / "quote_lookup.html"
 BRAND_NAME = "K大叔上網卡"
 
 
@@ -311,7 +312,7 @@ PAGE = """<!doctype html>
   <header>
     <div class="wrap">
       <h1>K大叔上網卡客服系統</h1>
-      <div class="status">商品資料來源：card.xlsx / eSim.xlsx</div>
+      <div class="status"><a href="/lookup">商品查詢</a>｜商品資料來源：card.xlsx / eSim.xlsx</div>
     </div>
   </header>
   <main class="wrap">
@@ -519,6 +520,22 @@ def parse_form(body: bytes) -> dict[str, str]:
     return {key: values[0] for key, values in parsed.items()}
 
 
+def serialize_result(result: Any) -> dict[str, str]:
+    product = result.product
+    return {
+        "source": product.source,
+        "name": product.name,
+        "quote": format_money(result.quote_total),
+        "quote_label": result.quote_label or "報價",
+        "cost": format_money(product.quote_cost),
+        "unit_price": product.unit_price,
+        "destinations": product.destinations,
+        "description": product.description,
+        "note": product.note,
+        "activation": product.activation,
+    }
+
+
 class SupportHandler(BaseHTTPRequestHandler):
     def is_authorized(self) -> bool:
         username = os.environ.get("SUPPORT_USERNAME")
@@ -551,11 +568,17 @@ class SupportHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self.require_authorization():
             return
-        path = urlparse(self.path).path
-        if path != "/":
-            self.send_error(HTTPStatus.NOT_FOUND)
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == "/":
+            self.send_html(render_page())
             return
-        self.send_html(render_page())
+        if parsed_url.path == "/lookup":
+            self.send_lookup_page()
+            return
+        if parsed_url.path == "/api/products":
+            self.send_product_results(parse_qs(parsed_url.query))
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
         if not self.require_authorization():
@@ -572,6 +595,49 @@ class SupportHandler(BaseHTTPRequestHandler):
     def send_html(self, body: bytes) -> None:
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_lookup_page(self) -> None:
+        if not LOOKUP_PAGE_PATH.exists():
+            self.send_error(HTTPStatus.NOT_FOUND, "找不到商品查詢頁面")
+            return
+        self.send_html(LOOKUP_PAGE_PATH.read_bytes())
+
+    def send_product_results(self, query: dict[str, list[str]]) -> None:
+        keyword_text = query.get("q", [""])[0].strip()
+        product_type = query.get("type", ["all"])[0]
+        if product_type not in {"all", "esim", "card"}:
+            product_type = "all"
+        try:
+            limit = max(1, min(int(query.get("limit", ["20"])[0]), 30))
+        except ValueError:
+            limit = 20
+
+        if not keyword_text:
+            self.send_json({"results": [], "message": "請輸入目的地或方案關鍵字。"})
+            return
+
+        try:
+            results = search_products(
+                tokenize(keyword_text), product_type=product_type, limit=limit
+            )
+        except (FileNotFoundError, ValueError) as error:
+            self.send_json({"results": [], "error": str(error)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        self.send_json(
+            {
+                "results": [serialize_result(result) for result in results],
+                "message": "" if results else "找不到符合條件的商品。",
+            }
+        )
+
+    def send_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
