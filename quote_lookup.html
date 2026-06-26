@@ -120,7 +120,7 @@
           <button type="submit">查詢</button>
         </div>
       </form>
-      <p class="quote-note">系統參考報價以 Excel 的既有「報價成本」邏輯計算；正式對外售價仍需依 K大叔上網卡的售價策略確認。</p>
+      <p class="quote-note">「不限流量、吃到飽、無限」會比對 Excel 的无限、MAX、unlimited。系統參考報價以既有報價成本邏輯計算；正式對外售價仍需依 K大叔上網卡售價策略確認。</p>
     </section>
     <p id="status" class="status">輸入條件後開始查詢。</p>
     <section id="results" class="result-list" aria-live="polite"></section>
@@ -188,7 +188,7 @@
         days: days.value,
         requirements: requirements.value.trim(),
         type: productType.value,
-        limit: '20',
+        limit: '0',
       });
       try {
         const response = await fetch(`/api/products?${params}`);
@@ -196,11 +196,7 @@
         if (!response.ok) throw new Error(payload.error || '資料讀取失敗。');
         renderResults(payload.results || []);
         if (payload.results.length) {
-          const displayed = payload.results.length;
-          const suffix = payload.total > displayed
-            ? `，目前顯示前 ${displayed} 筆；可用方案 / 電信商欄位縮小範圍。`
-            : '。';
-          status.textContent = `使用地符合的方案共 ${payload.total} 筆${suffix}`;
+          status.textContent = `使用地符合的方案共 ${payload.total} 筆，已全部顯示。`;
         } else {
           status.textContent = payload.message;
         }

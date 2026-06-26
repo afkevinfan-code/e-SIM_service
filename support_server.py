@@ -617,9 +617,10 @@ class SupportHandler(BaseHTTPRequestHandler):
         if product_type not in {"all", "esim", "card"}:
             product_type = "all"
         try:
-            limit = max(1, min(int(query.get("limit", ["20"])[0]), 30))
+            requested_limit = int(query.get("limit", ["0"])[0])
+            limit = requested_limit if requested_limit > 0 else None
         except ValueError:
-            limit = 20
+            limit = None
 
         if not destination_text and not legacy_query_text:
             self.send_json({"results": [], "message": "請輸入目的地或方案關鍵字。"})
@@ -646,7 +647,10 @@ class SupportHandler(BaseHTTPRequestHandler):
 
         self.send_json(
             {
-                "results": [serialize_result(result) for result in results[:limit]],
+                "results": [
+                    serialize_result(result)
+                    for result in (results if limit is None else results[:limit])
+                ],
                 "total": len(results),
                 "message": "" if results else "找不到符合條件的商品。",
             }

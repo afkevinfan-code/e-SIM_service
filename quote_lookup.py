@@ -22,6 +22,14 @@ LEGACY_CARD_PATH = Path(
 LEGACY_ESIM_PATH = Path(
     "/Users/kevinfan/Library/Mobile Documents/com~apple~CloudDocs/K-eSIM/eSim.xlsx"
 )
+UNLIMITED_QUERY_TERMS = {
+    "不限流量",
+    "吃到饱",
+    "无限",
+    "unlimited",
+    "max",
+}
+UNLIMITED_PRODUCT_TERMS = ("无限", "max", "unlimited")
 
 
 @dataclass
@@ -62,6 +70,32 @@ def normalize(text: object) -> str:
         "克罗埃西亚": "克罗地亚",
         "斯洛維尼亞": "斯洛文尼亚",
         "斯洛维尼亚": "斯洛文尼亚",
+        "荷蘭": "荷兰",
+        "愛爾蘭": "爱尔兰",
+        "愛沙尼亞": "爱沙尼亚",
+        "冰島": "冰岛",
+        "拉脫維亞": "拉脱维亚",
+        "盧森堡": "卢森堡",
+        "羅馬尼亞": "罗马尼亚",
+        "馬耳他": "马耳他",
+        "保加利亞": "保加利亚",
+        "烏克蘭": "乌克兰",
+        "梵蒂岡": "梵蒂冈",
+        "新加坡": "新加坡",
+        "紐西蘭": "新西兰",
+        "紐西兰": "新西兰",
+        "南韓": "韩国",
+        "韓國": "韩国",
+        "美國": "美国",
+        "英國": "英国",
+        "德國": "德国",
+        "法國": "法国",
+        "泰國": "泰国",
+        "中國": "中国",
+        "香港": "香港",
+        "澳門": "澳门",
+        "阿聯酋": "阿联酋",
+        "沙烏地阿拉伯": "沙特阿拉伯",
     }
     for old, new in country_aliases.items():
         value = value.replace(old, new)
@@ -77,7 +111,6 @@ def normalize(text: object) -> str:
         "紐": "纽",
         "蘭": "兰",
         "羅": "罗",
-        "義": "意",
         "無": "无",
         "線": "线",
         "總": "总",
@@ -90,10 +123,31 @@ def normalize(text: object) -> str:
         "體": "体",
         "虛": "虚",
         "擬": "拟",
+        "關": "关",
+        "島": "岛",
+        "爾": "尔",
+        "愛": "爱",
+        "脫": "脱",
+        "盧": "卢",
+        "烏": "乌",
+        "岡": "冈",
+        "聯": "联",
+        "酋": "酋",
+        "飽": "饱",
+        "維": "维",
+        "臘": "腊",
+        "麗": "丽",
     }
     for old, new in replacements.items():
         value = value.replace(old, new)
     return value
+
+
+def keyword_variants(keyword: str) -> tuple[str, ...]:
+    normalized = normalize(keyword)
+    if normalized in UNLIMITED_QUERY_TERMS:
+        return UNLIMITED_PRODUCT_TERMS
+    return (normalized,)
 
 
 def load_products(path: Path, source: str) -> list[Product]:
@@ -143,15 +197,17 @@ def score(product: Product, keywords: Iterable[str]) -> int:
         )
     )
     value = 0
+    normalized_destinations = normalize(product.destinations)
+    normalized_name = normalize(product.name)
     for keyword in keywords:
-        needle = normalize(keyword)
-        if not needle:
+        variants = keyword_variants(keyword)
+        if not any(variants):
             continue
-        if needle in normalize(product.destinations):
+        if any(needle in normalized_destinations for needle in variants):
             value += 6
-        if needle in normalize(product.name):
+        if any(needle in normalized_name for needle in variants):
             value += 4
-        if needle in haystack:
+        if any(needle in haystack for needle in variants):
             value += 2
     return value
 
@@ -169,7 +225,11 @@ def matches_all(product: Product, keywords: Iterable[str]) -> bool:
             ]
         )
     )
-    return all(normalize(keyword) in haystack for keyword in keywords if normalize(keyword))
+    return all(
+        any(variant in haystack for variant in keyword_variants(keyword))
+        for keyword in keywords
+        if normalize(keyword)
+    )
 
 
 def matches_destinations(product: Product, destinations: Iterable[str]) -> bool:
