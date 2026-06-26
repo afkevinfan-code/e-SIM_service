@@ -566,17 +566,17 @@ class SupportHandler(BaseHTTPRequestHandler):
         return False
 
     def do_GET(self) -> None:
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == "/healthz":
+            self.send_json({"status": "ok", "service": BRAND_NAME})
+            return
         if not self.require_authorization():
             return
-        parsed_url = urlparse(self.path)
         if parsed_url.path == "/":
             self.send_html(render_page())
             return
         if parsed_url.path == "/lookup":
             self.send_lookup_page()
-            return
-        if parsed_url.path == "/healthz":
-            self.send_json({"status": "ok", "service": BRAND_NAME})
             return
         if parsed_url.path == "/api/products":
             self.send_product_results(parse_qs(parsed_url.query))
