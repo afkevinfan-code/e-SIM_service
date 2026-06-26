@@ -171,6 +171,15 @@ def matches_all(product: Product, keywords: Iterable[str]) -> bool:
     return all(normalize(keyword) in haystack for keyword in keywords if normalize(keyword))
 
 
+def matches_destinations(product: Product, destinations: Iterable[str]) -> bool:
+    normalized_destinations = normalize(product.destinations)
+    return all(
+        normalize(destination) in normalized_destinations
+        for destination in destinations
+        if normalize(destination)
+    )
+
+
 def extract_day_hint(text: str) -> int | None:
     match = re.search(r"(\d+)\s*(?:天|日|day|days)", text, re.IGNORECASE)
     return int(match.group(1)) if match else None
@@ -249,21 +258,29 @@ def load_all_products(
 def search_products(
     keywords: list[str],
     product_type: str = "all",
-    limit: int = 12,
+    limit: int | None = 12,
     card_path: str | None = None,
     esim_path: str | None = None,
+    destination_keywords: list[str] | None = None,
+    plan_keywords: list[str] | None = None,
 ) -> list[SearchResult]:
-    query_text = " ".join(keywords)
+    destination_keywords = destination_keywords or []
+    plan_keywords = plan_keywords if plan_keywords is not None else keywords
+    query_text = " ".join([*destination_keywords, *plan_keywords])
     days = extract_day_hint(query_text)
-    effective_keywords = meaningful_keywords(keywords)
+    effective_plan_keywords = meaningful_keywords(plan_keywords)
     products = load_all_products(product_type, card_path, esim_path)
 
     ranked: list[SearchResult] = []
     for product in products:
-        if not matches_all(product, effective_keywords):
+        if destination_keywords and not matches_destinations(product, destination_keywords):
             continue
-        keyword_score = score(product, effective_keywords)
-        if keyword_score <= 0:
+        if effective_plan_keywords and not matches_all(product, effective_plan_keywords):
+            continue
+        keyword_score = score(product, destination_keywords) + score(
+            product, effective_plan_keywords
+        )
+        if keyword_score <= 0 and (destination_keywords or effective_plan_keywords):
             continue
         quote_total, quote_label = estimated_quote(product, days)
         ranked.append(
@@ -281,7 +298,7 @@ def search_products(
             item.quote_total if item.quote_total is not None else float("inf"),
         )
     )
-    return ranked[:limit]
+    return ranked[:limit] if limit is not None else ranked
 
 
 def main() -> None:

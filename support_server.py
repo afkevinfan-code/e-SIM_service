@@ -609,7 +609,10 @@ class SupportHandler(BaseHTTPRequestHandler):
         self.send_html(LOOKUP_PAGE_PATH.read_bytes())
 
     def send_product_results(self, query: dict[str, list[str]]) -> None:
-        keyword_text = query.get("q", [""])[0].strip()
+        destination_text = query.get("destinations", [""])[0].strip()
+        requirement_text = query.get("requirements", [""])[0].strip()
+        days = query.get("days", [""])[0].strip()
+        legacy_query_text = query.get("q", [""])[0].strip()
         product_type = query.get("type", ["all"])[0]
         if product_type not in {"all", "esim", "card"}:
             product_type = "all"
@@ -618,13 +621,24 @@ class SupportHandler(BaseHTTPRequestHandler):
         except ValueError:
             limit = 20
 
-        if not keyword_text:
+        if not destination_text and not legacy_query_text:
             self.send_json({"results": [], "message": "請輸入目的地或方案關鍵字。"})
             return
 
+        destination_keywords = tokenize(destination_text)
+        plan_keywords = tokenize(requirement_text)
+        if days.isdigit():
+            plan_keywords.append(f"{days}天")
+        if not destination_keywords:
+            plan_keywords = tokenize(legacy_query_text)
+
         try:
             results = search_products(
-                tokenize(keyword_text), product_type=product_type, limit=limit
+                [],
+                product_type=product_type,
+                limit=None,
+                destination_keywords=destination_keywords,
+                plan_keywords=plan_keywords,
             )
         except (FileNotFoundError, ValueError) as error:
             self.send_json({"results": [], "error": str(error)}, HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -632,7 +646,8 @@ class SupportHandler(BaseHTTPRequestHandler):
 
         self.send_json(
             {
-                "results": [serialize_result(result) for result in results],
+                "results": [serialize_result(result) for result in results[:limit]],
+                "total": len(results),
                 "message": "" if results else "找不到符合條件的商品。",
             }
         )

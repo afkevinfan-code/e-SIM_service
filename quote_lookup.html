@@ -94,7 +94,7 @@
   <main class="wrap">
     <section class="search-panel" aria-labelledby="search-title">
       <h2 id="search-title">建立報價條件</h2>
-      <p class="hint">依目的地、使用天數、流量需求與商品類型找出候選方案。多國行程可用逗號分隔，例如：希臘、義大利、黑山。系統會優先排序目的地與天數相符的商品。</p>
+      <p class="hint">目的地只依 Excel 的「使用地」欄位篩選。多國行程可用逗號分隔，例如：希臘、義大利、黑山；若要指定電信商，可在右側輸入 KDDI、SoftBank 或 IIJ。</p>
       <form id="search-form">
         <div class="search-grid">
           <div>
@@ -106,8 +106,8 @@
             <input id="days" name="days" type="number" min="1" max="365" placeholder="例：5">
           </div>
           <div>
-            <label for="requirements">流量 / 方案需求</label>
-            <input id="requirements" name="requirements" placeholder="例：不限流量、1GB/天、可熱點">
+            <label for="requirements">方案 / 電信商 / 流量</label>
+            <input id="requirements" name="requirements" placeholder="例：KDDI、不限流量、1GB/天">
           </div>
           <div>
             <label for="product-type">商品類型</label>
@@ -178,22 +178,32 @@
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const keyword = [
-        query.value.trim(),
-        days.value ? `${days.value}天` : '',
-        requirements.value.trim(),
-      ].filter(Boolean).join(' ');
-      if (!query.value.trim()) return;
+      const destination = query.value.trim();
+      if (!destination) return;
       status.className = 'status';
       status.textContent = '查詢中...';
       results.replaceChildren();
-      const params = new URLSearchParams({ q: keyword, type: productType.value, limit: '20' });
+      const params = new URLSearchParams({
+        destinations: destination,
+        days: days.value,
+        requirements: requirements.value.trim(),
+        type: productType.value,
+        limit: '20',
+      });
       try {
         const response = await fetch(`/api/products?${params}`);
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || '資料讀取失敗。');
         renderResults(payload.results || []);
-        status.textContent = payload.results.length ? `找到 ${payload.results.length} 筆候選商品。` : payload.message;
+        if (payload.results.length) {
+          const displayed = payload.results.length;
+          const suffix = payload.total > displayed
+            ? `，目前顯示前 ${displayed} 筆；可用方案 / 電信商欄位縮小範圍。`
+            : '。';
+          status.textContent = `使用地符合的方案共 ${payload.total} 筆${suffix}`;
+        } else {
+          status.textContent = payload.message;
+        }
       } catch (error) {
         status.className = 'status error';
         status.textContent = error.message || '查詢失敗，請稍後再試。';
