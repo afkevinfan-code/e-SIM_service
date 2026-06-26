@@ -575,6 +575,9 @@ class SupportHandler(BaseHTTPRequestHandler):
         if parsed_url.path == "/lookup":
             self.send_lookup_page()
             return
+        if parsed_url.path == "/healthz":
+            self.send_json({"status": "ok", "service": BRAND_NAME})
+            return
         if parsed_url.path == "/api/products":
             self.send_product_results(parse_qs(parsed_url.query))
             return

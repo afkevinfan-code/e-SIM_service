@@ -23,6 +23,19 @@ SUPPORT_PASSWORD=你的客服密碼
 
 平台通常會自動提供 `PORT`，系統已支援讀取 `PORT` 環境變數。
 
+## 用 Render 建立網站
+
+專案已包含 `render.yaml`，可用 Render Blueprint 建立服務：
+
+1. 登入 Render 並連接 GitHub。
+2. 選擇 `New` → `Blueprint`。
+3. 選擇 GitHub repo `afkevinfan-code/e-SIM_service`。
+4. Render 會讀取 `render.yaml`，建立名稱為 `e-sim-service` 的 Web Service。
+5. 在 Render 的 Environment 設定 `SUPPORT_USERNAME` 與 `SUPPORT_PASSWORD`。
+6. 按部署後，Render 會提供一個 HTTPS 網址，可給手機與外部客服使用。
+
+服務會用 `/healthz` 作為健康檢查。GitHub `main` 有新的 commit 時，Render 會自動重新部署。
+
 ## 需要一起上傳的檔案
 
 部署客服系統至少需要：
