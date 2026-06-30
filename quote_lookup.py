@@ -158,7 +158,8 @@ def load_products(path: Path, source: str) -> list[Product]:
     sheet = workbook.active
     headers = [str(cell.value or "") for cell in next(sheet.iter_rows(max_row=1))]
     index = {name: pos for pos, name in enumerate(headers)}
-    required_headers = ["商品名称", "单价(元)", "報價成本", "使用地", "商品描述"]
+    quote_header = "報價成本" if "報價成本" in index else "商品報價"
+    required_headers = ["商品名称", "单价(元)", quote_header, "使用地", "商品描述"]
     missing_headers = [name for name in required_headers if name not in index]
     if missing_headers:
         raise ValueError(
@@ -167,12 +168,15 @@ def load_products(path: Path, source: str) -> list[Product]:
 
     products: list[Product] = []
     for row in sheet.iter_rows(min_row=2, values_only=True):
+        name = str(row[index["商品名称"]] or "")
+        if "废卡" in name or "廢卡" in name:
+            continue
         products.append(
             Product(
                 source=source,
-                name=str(row[index["商品名称"]] or ""),
+                name=name,
                 unit_price=str(row[index["单价(元)"]] or ""),
-                quote_cost=row[index["報價成本"]],
+                quote_cost=row[index[quote_header]],
                 destinations=str(row[index["使用地"]] or ""),
                 description=str(row[index["商品描述"]] or ""),
                 note=str(row[index.get("备注", -1)] or "") if "备注" in index else "",
@@ -242,6 +246,8 @@ def matches_destinations(product: Product, destinations: Iterable[str]) -> bool:
 
 
 def extract_day_hint(text: str) -> int | None:
+    if re.fullmatch(r"\s*\d+\s*", text):
+        return int(text.strip())
     match = re.search(r"(\d+)\s*(?:天|日|day|days)", text, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
@@ -277,7 +283,7 @@ def meaningful_keywords(keywords: list[str]) -> list[str]:
     return [
         keyword
         for keyword in keywords
-        if not re.fullmatch(r"\d+\s*(?:天|日|day|days)", keyword, re.IGNORECASE)
+        if not re.fullmatch(r"\d+\s*(?:天|日|day|days)?", keyword, re.IGNORECASE)
     ]
 
 
@@ -329,6 +335,15 @@ def search_products(
     plan_keywords = plan_keywords if plan_keywords is not None else keywords
     query_text = " ".join([*destination_keywords, *plan_keywords])
     days = extract_day_hint(query_text)
+    if days is None:
+        days = next(
+            (
+                day
+                for keyword in [*destination_keywords, *plan_keywords]
+                if (day := extract_day_hint(keyword)) is not None
+            ),
+            None,
+        )
     effective_plan_keywords = meaningful_keywords(plan_keywords)
     products = load_all_products(product_type, card_path, esim_path)
 
